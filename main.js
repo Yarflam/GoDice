@@ -27,7 +27,8 @@ const ICONS = {
 	moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
 	activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
 	battery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>',
-	zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>'
+	zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+	layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>'
 };
 
 // Open the Bluetooth connection dialog for choosing a GoDice to connect
@@ -131,6 +132,16 @@ function applyLedMode(diceId, instance) {
 		diceIntervals[diceId] = setInterval(() => {
 			instance.pulseLed(preset.pulseCount, preset.onTime, preset.offTime, rgb);
 		}, durationMs);
+	} else if (state.mode === 'conditional') {
+		const val = instance.rolledValue || 0;
+		if (val >= 1) {
+			const idx = (val - 1) % 6;
+			const color = state.conditionalColors[idx];
+			const condRgb = hexToRgb(color);
+			instance.setLed(condRgb, condRgb);
+		} else {
+			instance.setLed([0], [0]);
+		}
 	}
 
 	// Update lastMode to current for next transition
@@ -153,6 +164,12 @@ function setLedMode(diceId, mode, btn) {
 	const buttons = wrapper.querySelectorAll('.led-mode-btn');
 	buttons.forEach(b => b.classList.remove('active'));
 	btn.classList.add('active');
+
+	// Show/hide conditional colors section
+	const condSection = document.getElementById(`${diceId}-conditional-section`);
+	if (condSection) {
+		condSection.style.display = mode === 'conditional' ? 'block' : 'none';
+	}
 
 	// Apply to die
 	applyLedMode(diceId, connectedDice[diceId]);
@@ -221,7 +238,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 			dieType: GoDice.diceTypes.D6,
 			dieColorName: null,
 			batteryLevel: null,
-			showBattery: false
+			conditionalColors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
 		};
 	}
 	const state = diceLedState[diceId];
@@ -331,9 +348,53 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	btnPulse.innerHTML = `${ICONS.activity} Pulsation`;
 	btnPulse.onclick = () => setLedMode(diceId, 'pulse', btnPulse);
 
-	modeBtns.append(btnOff, btnOn, btnPulse);
+	const btnConditional = document.createElement('button');
+	btnConditional.className = 'led-mode-btn' + (state.mode === 'conditional' ? ' active' : '');
+	btnConditional.innerHTML = `${ICONS.layers} Conditionnel`;
+	btnConditional.onclick = () => setLedMode(diceId, 'conditional', btnConditional);
+
+	modeBtns.append(btnOff, btnOn, btnPulse, btnConditional);
 	modeSection.append(modeLabel, modeBtns);
 	diceHtmlEl.append(modeSection);
+
+	// ===== CONDITIONAL COLORS =====
+	const condSection = document.createElement('div');
+	condSection.className = 'dice-section';
+	condSection.id = `${diceId}-conditional-section`;
+	condSection.style.display = state.mode === 'conditional' ? 'block' : 'none';
+
+	const condLabel = document.createElement('div');
+	condLabel.className = 'section-label';
+	condLabel.textContent = 'Couleurs par face';
+
+	const condGrid = document.createElement('div');
+	condGrid.className = 'conditional-grid';
+
+	state.conditionalColors.forEach((color, idx) => {
+		const wrapper = document.createElement('div');
+		wrapper.className = 'conditional-item';
+
+		const label = document.createElement('span');
+		label.className = 'conditional-label';
+		label.textContent = idx + 1;
+
+		const input = document.createElement('input');
+		input.type = 'color';
+		input.className = 'conditional-color';
+		input.value = color;
+		input.oninput = () => {
+			state.conditionalColors[idx] = input.value;
+			if (state.mode === 'conditional') {
+				applyLedMode(diceId, diceInstance);
+			}
+		};
+
+		wrapper.append(label, input);
+		condGrid.append(wrapper);
+	});
+
+	condSection.append(condLabel, condGrid);
+	diceHtmlEl.append(condSection);
 
 	// ===== PULSE SPEED =====
 	const speedSection = document.createElement('div');
@@ -405,6 +466,11 @@ GoDice.prototype.onStable = (diceId, value, xyzArray) => {
 		diceIndicatorEl.textContent = value;
 		diceIndicatorEl.classList.remove("rolling");
 	}
+
+	const state = diceLedState[diceId];
+	if (state && state.mode === 'conditional' && connectedDice[diceId]) {
+		applyLedMode(diceId, connectedDice[diceId]);
+	}
 };
 
 GoDice.prototype.onTiltStable = (diceId, xyzArray, value) => {
@@ -414,6 +480,11 @@ GoDice.prototype.onTiltStable = (diceId, xyzArray, value) => {
 	if (diceIndicatorEl) {
 		diceIndicatorEl.textContent = value;
 		diceIndicatorEl.classList.remove("rolling");
+	}
+
+	const state = diceLedState[diceId];
+	if (state && state.mode === 'conditional' && connectedDice[diceId]) {
+		applyLedMode(diceId, connectedDice[diceId]);
 	}
 };
 
@@ -425,6 +496,11 @@ GoDice.prototype.onFakeStable = (diceId, value, xyzArray) => {
 		diceIndicatorEl.textContent = value;
 		diceIndicatorEl.classList.remove("rolling");
 	}
+
+	const state = diceLedState[diceId];
+	if (state && state.mode === 'conditional' && connectedDice[diceId]) {
+		applyLedMode(diceId, connectedDice[diceId]);
+	}
 };
 
 GoDice.prototype.onMoveStable = (diceId, value, xyzArray) => {
@@ -434,6 +510,11 @@ GoDice.prototype.onMoveStable = (diceId, value, xyzArray) => {
 	if (diceIndicatorEl) {
 		diceIndicatorEl.textContent = value;
 		diceIndicatorEl.classList.remove("rolling");
+	}
+
+	const state = diceLedState[diceId];
+	if (state && state.mode === 'conditional' && connectedDice[diceId]) {
+		applyLedMode(diceId, connectedDice[diceId]);
 	}
 };
 

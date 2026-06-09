@@ -374,6 +374,60 @@ body {
 	border-radius: 4px;
 }
 
+/* ========== CONDITIONAL COLORS ========== */
+.conditional-grid {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 8px;
+}
+
+.conditional-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.conditional-label {
+	font-size: 0.7rem;
+	font-weight: 700;
+	color: var(--text-secondary);
+}
+
+.conditional-color {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 32px;
+	height: 32px;
+	border: 2px solid var(--border-color);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	background: transparent;
+	padding: 0;
+	overflow: hidden;
+	transition: var(--transition);
+}
+
+.conditional-color:hover {
+	border-color: var(--accent);
+	box-shadow: 0 0 8px var(--accent-glow);
+	transform: scale(1.1);
+}
+
+.conditional-color::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+
+.conditional-color::-webkit-color-swatch {
+	border: none;
+	border-radius: 4px;
+}
+
+.conditional-color::-moz-color-swatch {
+	border: none;
+	border-radius: 4px;
+}
+
 /* ========== LED MODE TOGGLE ========== */
 .led-modes {
 	display: flex;
