@@ -108,12 +108,10 @@ function applyLedMode(diceId, instance) {
 	// Stop any JavaScript interval
 	clearLedInterval(diceId);
 
-	// If we're leaving pulse mode for a non-pulse mode, send ONE forced-off command
-	// then stop — don't pile on extra setLed calls that may confuse the die
+	// If we're leaving pulse mode for a non-pulse mode, cancel the active pulse
+	// by sending a zero-length pulse on the same command ID, then apply the new mode
 	if (leavingPulse && !enteringPulse) {
-		instance.setLed([0, 0, 0], [0, 0, 0]);
-		state.lastMode = state.mode;
-		return;
+		instance.pulseLed(0, 0, 0, [0, 0, 0]);
 	}
 
 	const rgb = hexToRgb(state.color);
