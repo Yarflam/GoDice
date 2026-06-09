@@ -1,6 +1,34 @@
 const connectedDice = {};
 const diceIntervals = {};   // Stores intervals for persistent LED effects
 const diceLedState = {};    // Stores current LED state per die
+const STATE_STORAGE_PREFIX = 'godice-state-';
+
+function saveDiceState(diceId) {
+	const state = diceLedState[diceId];
+	if (!state) return;
+	const toSave = {
+		color: state.color,
+		mode: state.mode,
+		pulseSpeed: state.pulseSpeed,
+		conditionalColors: state.conditionalColors,
+		dieType: state.dieType
+	};
+	try {
+		localStorage.setItem(STATE_STORAGE_PREFIX + diceId, JSON.stringify(toSave));
+	} catch (e) {
+		console.error('Failed to save dice state', e);
+	}
+}
+
+function loadDiceState(diceId) {
+	try {
+		const raw = localStorage.getItem(STATE_STORAGE_PREFIX + diceId);
+		if (raw) return JSON.parse(raw);
+	} catch (e) {
+		console.error('Failed to load dice state', e);
+	}
+	return null;
+}
 
 // Mappings
 const DIE_TYPE_LABELS = {
@@ -172,6 +200,7 @@ function setLedMode(diceId, mode, btn) {
 
 	// Apply to die
 	applyLedMode(diceId, connectedDice[diceId]);
+	saveDiceState(diceId);
 }
 
 /**
@@ -211,6 +240,7 @@ function setPulseSpeed(diceId, speedKey, btn) {
 	if (state.mode === 'pulse') {
 		applyLedMode(diceId, connectedDice[diceId]);
 	}
+	saveDiceState(diceId);
 }
 
 /**
@@ -233,6 +263,7 @@ function onColorChange(diceId, input) {
 	// Re-apply current mode with new color
 	// applyLedMode handles lastMode internally so it won't force-off when staying in pulse
 	applyLedMode(diceId, connectedDice[diceId]);
+	saveDiceState(diceId);
 }
 
 GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
@@ -245,18 +276,24 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	// Track die
 	connectedDice[diceId] = diceInstance;
 
-	// Initialize LED state
-	if (!diceLedState[diceId]) {
-		diceLedState[diceId] = {
-			color: '#00aaff',
-			mode: 'off',
-			lastMode: 'off',
-			pulseSpeed: 'normal',
-			dieType: GoDice.diceTypes.D6,
-			dieColorName: null,
-			batteryLevel: null,
-			conditionalColors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
-		};
+	// Default state
+	const defaults = {
+		color: '#00aaff',
+		mode: 'off',
+		lastMode: 'off',
+		pulseSpeed: 'normal',
+		dieType: GoDice.diceTypes.D6,
+		dieColorName: null,
+		batteryLevel: null,
+		conditionalColors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+	};
+
+	// Try to load saved state, otherwise use defaults
+	const saved = loadDiceState(diceId);
+	if (saved) {
+		diceLedState[diceId] = { ...defaults, ...saved, lastMode: 'off', dieColorName: null, batteryLevel: null };
+	} else if (!diceLedState[diceId]) {
+		diceLedState[diceId] = { ...defaults };
 	}
 	const state = diceLedState[diceId];
 
@@ -404,6 +441,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 			if (state.mode === 'conditional') {
 				applyLedMode(diceId, diceInstance);
 			}
+			saveDiceState(diceId);
 		};
 
 		wrapper.append(label, input);
