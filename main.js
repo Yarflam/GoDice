@@ -3,7 +3,6 @@ const diceIntervals = {};   // Stores intervals for persistent LED effects
 const diceLedState = {};    // Stores current LED state per die
 
 // Mappings
-const DICE_COLOR_NAMES = ['Noir', 'Rouge', 'Vert', 'Bleu', 'Jaune', 'Orange'];
 const DIE_TYPE_LABELS = {
 	[GoDice.diceTypes.D6]:   'D6',
 	[GoDice.diceTypes.D20]:  'D20',
@@ -16,9 +15,9 @@ const DIE_TYPE_LABELS = {
 
 // Pulse speed presets — tuned to ~6s total duration so stopping feels responsive
 const PULSE_PRESETS = {
-	slow:   { onTime: 30, offTime: 30, pulseCount: 10, label: 'Lent' },    // 10 × 600ms = 6s
-	normal: { onTime: 20, offTime: 20, pulseCount: 15, label: 'Normal' },  // 15 × 400ms = 6s
-	fast:   { onTime: 10, offTime: 10, pulseCount: 30, label: 'Rapide' },  // 30 × 200ms = 6s
+	slow:   { onTime: 30, offTime: 30, pulseCount: 10,  labelKey: 'slow' },
+	normal: { onTime: 20, offTime: 20, pulseCount: 15,  labelKey: 'normal' },
+	fast:   { onTime: 10, offTime: 10, pulseCount: 30,  labelKey: 'fast' },
 };
 
 // Icons SVG
@@ -64,7 +63,7 @@ function hexToRgb(hex) {
 }
 
 /**
- * Update dice header title with type + physical color
+ * Update dice header title with physical color
  */
 function updateDiceHeader(diceId) {
 	const state = diceLedState[diceId];
@@ -74,7 +73,7 @@ function updateDiceHeader(diceId) {
 	if (!headerTitle) return;
 
 	const colorName = state.dieColorName || '…';
-	headerTitle.textContent = `Dé ${colorName}`;
+	headerTitle.textContent = `${t('dice')} ${colorName}`;
 }
 
 /**
@@ -173,6 +172,24 @@ function setLedMode(diceId, mode, btn) {
 
 	// Apply to die
 	applyLedMode(diceId, connectedDice[diceId]);
+}
+
+/**
+ * Called when language changes — re-render all connected dice cards
+ */
+function onLangChange() {
+	const diceHost = document.getElementById("dice-host");
+	if (!diceHost) return;
+
+	// Remove all existing cards
+	while (diceHost.firstChild) {
+		diceHost.removeChild(diceHost.lastChild);
+	}
+
+	// Re-create each card with new language
+	Object.entries(connectedDice).forEach(([diceId, diceInstance]) => {
+		GoDice.prototype.onDiceConnected(diceId, diceInstance);
+	});
 }
 
 /**
@@ -276,7 +293,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	batteryBadge.id = `${diceId}-battery-indicator`;
 	batteryBadge.innerHTML = `${ICONS.battery} --%`;
 	batteryBadge.style.cursor = 'pointer';
-	batteryBadge.title = 'Cliquer pour rafraîchir';
+	batteryBadge.title = t('batteryTooltip');
 	batteryBadge.onclick = () => diceInstance.getBatteryLevel();
 
 	header.append(nameArea, batteryBadge);
@@ -289,7 +306,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	const rollValue = document.createElement('div');
 	rollValue.className = 'roll-value';
 	rollValue.id = `${diceId}-die-status`;
-	rollValue.textContent = 'Prêt';
+	rollValue.textContent = t('ready');
 
 	rollSection.append(rollValue);
 	diceHtmlEl.append(rollSection);
@@ -300,7 +317,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 
 	const colorLabel = document.createElement('div');
 	colorLabel.className = 'section-label';
-	colorLabel.textContent = 'Couleur LED';
+	colorLabel.textContent = t('diceColorLabel');
 
 	const colorControl = document.createElement('div');
 	colorControl.className = 'color-control';
@@ -315,7 +332,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	colorInput.oninput = () => onColorChange(diceId, colorInput);
 
 	const colorLabelText = document.createElement('label');
-	colorLabelText.textContent = 'Choisir';
+	colorLabelText.textContent = t('choose');
 
 	colorPicker.append(colorLabelText, colorInput);
 	colorControl.append(colorPicker);
@@ -328,29 +345,29 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 
 	const modeLabel = document.createElement('div');
 	modeLabel.className = 'section-label';
-	modeLabel.textContent = 'Mode d\'éclairage';
+	modeLabel.textContent = t('lightingMode');
 
 	const modeBtns = document.createElement('div');
 	modeBtns.className = 'led-modes';
 
 	const btnOff = document.createElement('button');
 	btnOff.className = 'led-mode-btn' + (state.mode === 'off' ? ' active' : '');
-	btnOff.innerHTML = `${ICONS.moon} Éteint`;
+	btnOff.innerHTML = `${ICONS.moon} ${t('off')}`;
 	btnOff.onclick = () => setLedMode(diceId, 'off', btnOff);
 
 	const btnOn = document.createElement('button');
 	btnOn.className = 'led-mode-btn' + (state.mode === 'on' ? ' active' : '');
-	btnOn.innerHTML = `${ICONS.sun} Allumé`;
+	btnOn.innerHTML = `${ICONS.sun} ${t('on')}`;
 	btnOn.onclick = () => setLedMode(diceId, 'on', btnOn);
 
 	const btnPulse = document.createElement('button');
 	btnPulse.className = 'led-mode-btn' + (state.mode === 'pulse' ? ' active' : '');
-	btnPulse.innerHTML = `${ICONS.activity} Pulsation`;
+	btnPulse.innerHTML = `${ICONS.activity} ${t('pulse')}`;
 	btnPulse.onclick = () => setLedMode(diceId, 'pulse', btnPulse);
 
 	const btnConditional = document.createElement('button');
 	btnConditional.className = 'led-mode-btn' + (state.mode === 'conditional' ? ' active' : '');
-	btnConditional.innerHTML = `${ICONS.layers} Conditionnel`;
+	btnConditional.innerHTML = `${ICONS.layers} ${t('conditional')}`;
 	btnConditional.onclick = () => setLedMode(diceId, 'conditional', btnConditional);
 
 	modeBtns.append(btnOff, btnOn, btnPulse, btnConditional);
@@ -365,7 +382,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 
 	const condLabel = document.createElement('div');
 	condLabel.className = 'section-label';
-	condLabel.textContent = 'Couleurs par face';
+	condLabel.textContent = t('conditionalColors');
 
 	const condGrid = document.createElement('div');
 	condGrid.className = 'conditional-grid';
@@ -402,7 +419,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 
 	const speedLabel = document.createElement('div');
 	speedLabel.className = 'section-label';
-	speedLabel.innerHTML = `${ICONS.zap} Vitesse pulsation`;
+	speedLabel.innerHTML = `${ICONS.zap} ${t('pulseSpeed')}`;
 
 	const speedBtns = document.createElement('div');
 	speedBtns.className = 'led-modes';
@@ -410,7 +427,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 	Object.entries(PULSE_PRESETS).forEach(([key, preset]) => {
 		const btn = document.createElement('button');
 		btn.className = 'pulse-speed-btn led-mode-btn' + (state.pulseSpeed === key ? ' active' : '');
-		btn.textContent = preset.label;
+		btn.textContent = t(preset.labelKey);
 		btn.onclick = () => setPulseSpeed(diceId, key, btn);
 		speedBtns.append(btn);
 	});
@@ -450,7 +467,7 @@ GoDice.prototype.onDiceDisconnected = (diceId, diceInstance) => {
 
 	const diceIndicatorEl = document.getElementById(diceId + "-die-status");
 	if (diceIndicatorEl) {
-		diceIndicatorEl.textContent = "Déconnecté";
+		diceIndicatorEl.textContent = t('disconnected');
 		diceIndicatorEl.classList.remove("rolling");
 	}
 
@@ -538,7 +555,8 @@ GoDice.prototype.onBatteryLevel = (diceId, batteryLevel) => {
 GoDice.prototype.onDiceColor = (diceId, color) => {
 	console.log("DiceColor: ", diceId, color);
 
-	const colorName = DICE_COLOR_NAMES[color] || `Couleur ${color}`;
+	const names = getDiceColorNames();
+	const colorName = names[color] || `Color ${color}`;
 
 	const state = diceLedState[diceId];
 	if (state) {
