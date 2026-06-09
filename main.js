@@ -1,6 +1,7 @@
 const connectedDice = {};
 const diceIntervals = {};   // Stores intervals for persistent LED effects
 const diceLedState = {};    // Stores current LED state per die
+const colorChangeTimeouts = {}; // Debounce timers for color picker changes
 const STATE_STORAGE_PREFIX = 'godice-state-';
 
 function saveDiceState(diceId) {
@@ -28,6 +29,20 @@ function loadDiceState(diceId) {
 		console.error('Failed to load dice state', e);
 	}
 	return null;
+}
+
+/**
+ * Debounced apply of LED color to avoid spamming the die with BLE commands
+ * when dragging inside a native color picker.
+ */
+function debouncedApplyColor(diceId, instance, delay = 150) {
+	if (colorChangeTimeouts[diceId]) {
+		clearTimeout(colorChangeTimeouts[diceId]);
+	}
+	colorChangeTimeouts[diceId] = setTimeout(() => {
+		applyLedMode(diceId, instance);
+		delete colorChangeTimeouts[diceId];
+	}, delay);
 }
 
 // Mappings
@@ -260,9 +275,11 @@ function onColorChange(diceId, input) {
 		strip.style.opacity = '1';
 	}
 
-	// Re-apply current mode with new color
-	// applyLedMode handles lastMode internally so it won't force-off when staying in pulse
-	applyLedMode(diceId, connectedDice[diceId]);
+	// Re-apply current mode with new color (debounced to avoid BLE spam)
+	const instance = connectedDice[diceId];
+	if (instance && state.mode !== 'off') {
+		debouncedApplyColor(diceId, instance);
+	}
 	saveDiceState(diceId);
 }
 
@@ -439,7 +456,7 @@ GoDice.prototype.onDiceConnected = (diceId, diceInstance) => {
 		input.oninput = () => {
 			state.conditionalColors[idx] = input.value;
 			if (state.mode === 'conditional') {
-				applyLedMode(diceId, diceInstance);
+				debouncedApplyColor(diceId, diceInstance);
 			}
 			saveDiceState(diceId);
 		};
